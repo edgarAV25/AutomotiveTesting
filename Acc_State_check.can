@@ -1,0 +1,331 @@
+/*@!Encoding:1252*/
+includes
+{
+  
+  #include "..\Nodes\ACC_Test_lib.cin"
+}
+
+variables
+{
+  
+}
+
+testcase ACC_Active_to_OFF()
+{
+  chk_ACC_Active_State(85);
+  Press_cruise_sw(0);
+  testValidateSignalMatch("Check ACC is OFF",ACCInfo::ACCState,0);
+}
+
+testcase Chk_Brakelight_ON_Test()
+{
+  chk_ACC_Active_State(80);
+  Brake_Light_Ver();
+}
+
+testcase Acc_off_Test()
+{
+  int result;
+  Switch_vehicle_to_driving_mode(2,40);
+  testValidateSignalMatch("Check ACC is OFF",ACCInfo::ACCState,0);
+  result=testWaitForTesterConfirmation("Is ACC OFF");
+  if(result==1)
+  {
+    testStepPass("ACC is OFF");
+  }
+  else    
+  {
+    testStepFail("ACC is not OFF");
+  }
+  Press_cruise_sw(2);
+  testValidateSignalMatch("Check ACC is OFF",ACCInfo::ACCState,0);
+  result=testWaitForTesterConfirmation("Is ACC OFF");
+  if(result==1)
+  {
+    testStepPass("ACC is OFF");
+  }
+  else    
+  {
+    testStepFail("ACC is not OFF");
+  }
+  
+}
+
+
+
+testcase Forced_ACC_OFF_Check_from_Standby()
+{
+  Press_cruise_sw(0);
+  testValidateSignalMatch("Check ACC is OFF",ACCInfo::ACCState,0);
+}
+
+testcase ACC_Active_test(int vehicle_speed)
+{
+  Switch_vehicle_to_driving_mode(2,vehicle_speed);
+  testValidateSignalMatch("Check ACC is OFF",ACCInfo::ACCState,0);
+  testWaitForTimeout(1000);
+  Press_cruise_sw(1);
+  testWaitForTimeout(1000);
+  testValidateSignalMatch("Check ACC is STANDBY",ACCInfo::ACCState,2);
+  Press_cruise_sw(2);
+  testWaitForTimeout(1000);
+  testValidateSignalMatch("Check ACC is ACTIVE",ACCInfo::ACCState,3);
+  Switch_vehicle_to_OFF_mode(0,0);
+  testWaitForTimeout(1000);
+}
+
+testcase Validate_vehiclespeed_lessthan_setspeed()
+{
+  //ACC_Active_test(86);
+  chk_ACC_Active_State(45);
+  @sysvar::ForwardVehicleSt=1;
+  testWaitForTimeout(1000);
+  Read_DID(0x1020);
+  testWaitForTimeout(1000);
+   if (@sysvar::Diagnostic::DID_Read_Result > getSignal(BCMInfo::VehicleSpeed))
+  {
+    testStepPass("Vehicle Speed is less than SetSpeed");
+  }
+  else
+  {
+     testStepFail("Vehicle Speed is notless than SetSpeed");
+  }
+  Switch_vehicle_to_OFF_mode(0,0);
+  testWaitForTimeout(1000);
+}
+
+testcase Validate_Vehicle_Speed_Apprx_Equalto_Set_Speed()
+{
+  chk_ACC_Active_State(86);
+  @sysvar::ForwardVehicleSt=0;
+  testWaitForTimeout(1000);
+  Read_DID(0x1020);
+  testWaitForTimeout(5000); 
+  testValidateSignalInRange("Check Vehicle Speed is Approximately equal to Set Speed",BCMInfo::VehicleSpeed,@sysvar::Diagnostic::DID_Read_Result - 5,@sysvar::Diagnostic::DID_Read_Result + 5);
+  
+}
+
+testcase Validate_ACC_Cancel_upon_Brakeswitch1_Press()
+{
+  setSignal(ICMInfo::BrakeSwitch1,1);
+  testWaitForTimeout(1000);
+  testValidateSignalMatch("Check ACC is Cancelled upon Brakeswitch1 Press",ACCInfo::ACCState,2);
+  setSignal(ICMInfo::BrakeSwitch1,0);
+}
+
+testcase validate_time_gap_with_fwd_vehicle_found()
+{ 
+  chk_ACC_Active_State(80);
+  Press_cruise_sw(5);
+  testStep("Bring"," forward vehicle");
+  @sysvar::ForwardVehicleSt=1;
+  testwaitfortimeout(1000);
+  testStep("Check"," ACCInfo::TargetSpeed < 59");
+  if(getSignal(ACCInfo::TargetSpeed) < 59)   
+  {
+    testStepPass("Target speed is less than default target speed");
+  }
+  else
+  {
+    testStepFail("Target speed is not less  than default target speed");
+  }
+  
+  
+}
+
+testcase validate_time_gap_minus_with_fwd_vehicle_found()
+{ 
+  chk_ACC_Active_State(80);
+  Press_cruise_sw(6);
+  testStep("Bring"," forward vehicle");
+  @sysvar::ForwardVehicleSt=1;
+  testwaitfortimeout(1000);
+  testStep("Check"," ACCInfo::TargetSpeed > 59");
+  if(getSignal(ACCInfo::TargetSpeed) > 59)   
+  {
+    testStepPass("Target speed is greater than default target speed");
+  }
+  else
+  {
+    testStepFail("Target speed is less  than default target speed");
+  }
+}
+testcase check_driver_intervention_msg_with_vehspeed_lessthan40kmph()
+{
+  int result;
+  chk_ACC_Active_State(60);
+  do
+  {
+    testStep("Press"," Time gap+");
+    Press_cruise_sw(5);
+    testWaitForTimeout(1000);
+    testStep("Bring"," forward vehicle");
+    @sysvar::ForwardVehicleSt=1;
+    testWaitForTimeout(1000);
+    testStep("check"," Target speed less than 40kmph");
+    if(getSignal(ACCInfo::TargetSpeed)<40)
+      break;
+    @sysvar::ForwardVehicleSt=0;
+    testWaitForTimeout(1000);
+  }while(getSignal(ACCInfo::TargetSpeed)>40);
+ result= testWaitForTesterConfirmation("Is driver intervention message displayed in ICM?");
+  if(result==1)
+  {
+    testStepPass("Driver intervention message displayed in ICM");
+  }
+  else
+  {
+    testStepFail("Driver intervention message not displayed in ICM");
+  }
+}
+
+testcase validate_ACC_off_with_brake_pedal_Press()
+{
+   chk_ACC_Active_State(60);
+   @sysvar::breakpaddlestaus=1;
+   testWaitForTimeout(1000);
+   testValidateSignalMatch("Is ACC turned off",ACCInfo::ACCState,0);  
+}
+
+void MainTest ()
+{
+TestModuleTitle ("ACC State Check");
+TestModuleDescription ("To check different state of ACC module");
+TestGroupBegin("ACC States","Collection of ACC States");
+//Acc_off_Test();
+//ACC_Active_test(56);
+//Validate_Vehicle_Speed_Apprx_Equalto_Set_Speed();
+//Switch_vehicle_to_OFF_mode(0,0);
+//Validate_Vehicle_Speed_Apprx_Equalto_Set_Speed();
+//Validate_ACC_Cancel_upon_Brakeswitch1_Press();
+//Switch_vehicle_to_OFF_mode(0,0);
+//Check_ACC_Standby_State(60);
+//Forced_ACC_OFF_Check_from_Standby();
+//ACC_Active_to_OFF();
+//Chk_Brakelight_ON_Test();
+//Chk_ACC_OFF_in_IGN_OFF();
+//Chk_ACC_in_fault_state();
+//Chk_Coast_and_Resume_Button_Behavior();
+//Chk_ACC_state_upon_BSW2_press_n_hold();
+  // Chk_ACC_with_low_speed();
+//  Chk_ACC_with_Frwd_Veh();
+//  Chk_ACC_with_Frwd_Veh_not_found();
+//  validate_time_gap_with_fwd_vehicle_found();
+//validate_time_gap_minus_with_fwd_vehicle_found();
+//check_driver_intervention_msg_with_vehspeed_lessthan40kmph();
+ //validate_ACC_off_with_brake_pedal_Press();
+ check_turn_Acc_off_with_vehiclespeed_lessthan_40kmph();
+TestGroupEnd();
+}
+
+testcase check_turn_Acc_off_with_vehiclespeed_lessthan_40kmph()
+{
+  Check_ACC_Standby_State(80);
+  setSignal(BCMInfo::VehicleSpeed,35);
+  testWaitForTimeout(1000);
+  testValidateSignalMatch("Check Acc is OFF",ACCInfo::ACCState,0);
+}
+
+testcase Chk_ACC_in_fault_state()
+{
+  Switch_vehicle_to_driving_mode(2,60);
+  setSignal(ACCInfo::ACCState,4);
+  testWaitForTimeout(1000);
+  Press_cruise_sw(1);
+  testValidateSignalMatch("Check ACC remains in fault state",ACCInfo::ACCState,4);
+   
+}
+
+testcase Chk_Coast_and_Resume_Button_Behavior()
+{
+  chk_ACC_Active_State(80);
+  Read_DID(0x1020);
+  Press_cruise_sw(3);
+  testValidateSignalMatch("Check ACC is in Standby state",ACCInfo::ACCState,2);
+  Press_cruise_sw(4);
+  testValidateSignalMatch("Check ACC is in Active state",ACCInfo::ACCState,3);
+  if (@sysvar::Diagnostic::DID_Read_Result == getSignal(ACCInfo::TargetSpeed))
+  {
+    testStepPass("Target Speed is equal to set speed");
+  }
+  else
+  {
+    testStepFail("Target Speed is not equal to set speed");
+  }
+}
+
+testcase Chk_ACC_state_upon_BSW1_press_n_hold()
+{
+  Check_ACC_Standby_State(80);
+  setSignal(ICMInfo::BrakeSwitch1,1);
+  testWaitForTimeout(1000);
+  Press_cruise_sw(2);
+  testValidateSignalMatch("Check ACC is in Standby state",ACCInfo::ACCState,2);
+  setSignal(ICMInfo::BrakeSwitch1,0);
+}
+
+testcase Chk_ACC_state_upon_BSW2_press_n_hold()
+{
+  Check_ACC_Standby_State(80);
+  setSignal(ECMinfo::BrakeSwitch2,1);
+  testWaitForTimeout(1000);
+  Press_cruise_sw(2);
+  testValidateSignalMatch("Check ACC is in Standby state",ACCInfo::ACCState,2);
+  setSignal(ECMinfo::BrakeSwitch2,0);
+}
+
+testcase Chk_ACC_with_low_speed()
+{
+  Switch_vehicle_to_driving_mode(2,30);
+  Press_cruise_sw(1);
+  testValidateSignalMatch("Check ACC remains is in OFF State",ACCInfo::ACCState,0);
+}
+
+testcase Chk_ACC_with_Frwd_Veh()
+{
+  chk_ACC_Active_State(80);
+  @sysvar::ForwardVehicleSt=1;
+  testWaitForTimeout(1000);
+  testStep("Check"," ACCInfo::TargetSpeed < BCMInfo::VehicleSpeed and ACCInfo::BrakeDecelReq==1");
+  if(getSignal(ACCInfo::TargetSpeed) < getSignal(BCMInfo::VehicleSpeed) && getSignal(ACCInfo::BrakeDecelReq)==1 )
+  {
+    testStepPass("Target speed is less than vehicle speed, Brake Deacceleration request is applied");
+  }
+  else
+  {
+    testStepFail("Target speed is greater than vehicle speed, Brake Deacceleration request is not applied");
+  }
+}
+
+testcase Chk_ACC_OFF_in_IGN_OFF()
+{
+  chk_ACC_Active_State(80);
+  Switch_vehicle_to_OFF_mode(0,0);
+  testValidateSignalMatch("Check ACC state is OFF",ACCInfo::ACCState,0);
+}
+testcase Chk_ACC_with_Frwd_Veh_not_found()
+{
+  chk_ACC_Active_State(80);
+  @sysvar::ForwardVehicleSt=1;
+  testWaitForTimeout(1000);
+  testStep("Check"," ACCInfo::TargetSpeed < BCMInfo::VehicleSpeed and ACCInfo::BrakeDecelReq==1");
+  if(getSignal(ACCInfo::TargetSpeed) < getSignal(BCMInfo::VehicleSpeed) && getSignal(ACCInfo::BrakeDecelReq)==1 )
+  {
+    testStepPass("Target speed is less than vehicle speed, Brake Deacceleration request is applied");
+  }
+  else
+  {
+    testStepFail("Target speed is greater than vehicle speed, Brake Deacceleration request is not applied");
+  }
+   @sysvar::ForwardVehicleSt=0;
+  testWaitForTimeout(1000);
+  testStep("Check"," ACCInfo::TargetSpeed > BCMInfo::VehicleSpeed and ACCInfo::BrakeDecelReq==0");
+  if(getSignal(ACCInfo::TargetSpeed) > getSignal(BCMInfo::VehicleSpeed) && getSignal(ACCInfo::BrakeDecelReq)==0 )
+  {
+    testStepPass("Target speed is greater than vehicle speed, Brake Deacceleration request is not applied");
+  }
+  else
+  {
+    testStepFail("Target speed is less than vehicle speed, Brake Deacceleration request is applied");
+  }
+}
